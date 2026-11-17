@@ -3,39 +3,58 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Provider } from "react-redux";
+import axios from "axios";
 
 import { makeStore, type AppStore } from "@/lib/store";
-import {
-  restoreSession,
-  type AuthUser,
-} from "@/features/auth/authSlice";
+import { restoreSession, type AuthUser } from "@/features/auth/authSlice";
+import api from "@/services/api";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [store, setStore] = useState<AppStore | null>(null);
 
   useEffect(() => {
-    const newStore = makeStore();
+    let cancelled = false;
 
-    const token = localStorage.getItem("facilitybook_token");
-    const savedUser = localStorage.getItem("facilitybook_user");
+    async function initializeStore() {
+      const newStore = makeStore();
+      const token = localStorage.getItem("facilitybook_token");
 
-    if (token && savedUser) {
-      try {
-        const user = JSON.parse(savedUser) as AuthUser;
+      if (token) {
+        try {
+          const response = await api.get<AuthUser>("/auth/me");
+          const user = response.data;
 
-        newStore.dispatch(
-          restoreSession({
-            user,
-            token,
-          })
-        );
-      } catch {
-        localStorage.removeItem("facilitybook_token");
+          if (user.active) {
+            newStore.dispatch(restoreSession({ user, token }));
+            localStorage.setItem("facilitybook_user", JSON.stringify(user));
+          } else {
+            localStorage.removeItem("facilitybook_token");
+            localStorage.removeItem("facilitybook_user");
+          }
+        } catch (error: unknown) {
+          if (axios.isAxiosError(error) && error.response?.status === 401) {
+            localStorage.removeItem("facilitybook_token");
+            localStorage.removeItem("facilitybook_user");
+          } else if (axios.isAxiosError(error)) {
+            console.error("Could not verify the saved FacilityBook session.", error);
+          } else {
+            throw error;
+          }
+        }
+      } else {
         localStorage.removeItem("facilitybook_user");
+      }
+
+      if (!cancelled) {
+        setStore(newStore);
       }
     }
 
-    setStore(newStore);
+    void initializeStore();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Wait until the Redux store is initialized in the browser.

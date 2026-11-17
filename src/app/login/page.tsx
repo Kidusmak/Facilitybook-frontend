@@ -1,6 +1,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -90,7 +91,10 @@ export default function LoginPage() {
           | { message?: string; error?: string }
           | undefined;
 
-        if (error.response?.status === 401) {
+        if (error.response?.status === 403) {
+          errorMessage =
+            "Your account is inactive. If you just signed up, wait for administrator approval; otherwise contact your administrator.";
+        } else if (error.response?.status === 401) {
           errorMessage = "Invalid email or password.";
         } else if (responseData?.message) {
           errorMessage = responseData.message;
@@ -341,6 +345,16 @@ export default function LoginPage() {
                 </div>
               )}
             </form>
+
+            <p className="mt-6 text-center text-sm text-gray-500">
+              New to FacilityBook?{" "}
+              <Link
+                href="/signup"
+                className="font-semibold text-[#078052] hover:underline"
+              >
+                Create an account
+              </Link>
+            </p>
 
             <div className="mt-12 border-t border-gray-100 pt-6 text-center">
               <p className="text-xs text-gray-400">
